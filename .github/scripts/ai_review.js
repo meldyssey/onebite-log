@@ -1,39 +1,26 @@
-  import { readFileSync } from "fs";
-  import OpenAI from "openai";
+import { readFileSync, appendFileSync } from "fs";
+import OpenAI from "openai";
 
-  const MAX_CHARS = 80_000;
+const MAX_CHARS = 80_000;
 
-  async function postComment(body) {
-    const { GITHUB_TOKEN, GITHUB_REPOSITORY, COMMIT_SHA } = process.env;
-    const url = `https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${COMMIT_SHA}/comments`;
+function writeToStepSummary(body) {
+  appendFileSync(process.env.GITHUB_STEP_SUMMARY, body);
+}
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GITHUB_TOKEN}`,
-        Accept: "application/vnd.github+json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ body }),
-    });
+async function main() {
+  let diff = readFileSync("pr_diff.txt", "utf-8");
 
-    if (!response.ok) throw new Error(`GitHub API error: ${response.status}`);
+  if (!diff.trim()) {
+    console.log("변경사항 없음, 리뷰 스킵");
+    return;
   }
 
-  async function main() {
-    let diff = readFileSync("pr_diff.txt", "utf-8");
+  const truncated = diff.length > MAX_CHARS;
+  if (truncated) diff = diff.slice(0, MAX_CHARS);
 
-    if (!diff.trim()) {
-      console.log("변경사항 없음, 리뷰 스킵");
-      return;
-    }
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    const truncated = diff.length > MAX_CHARS;
-    if (truncated) diff = diff.slice(0, MAX_CHARS);
-
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-    const prompt = `You are a senior React/TypeScript developer. Please review the PR diff below and respond in Korean.
+  const prompt = `You are a senior React/TypeScript developer. Please review the PR diff below and respond in Korean.
 Project: React 19 + TypeScript + Firebase + Tailwind CSS advent calendar app
 
 Review criteria:
@@ -56,28 +43,28 @@ Format:
 
 If overall looks good, a short compliment is fine. Keep feedback concise and actionable.
 
-  \`\`\`diff
-  ${diff}
-  \`\`\`
-  ${truncated ? "\n> ⚠️  diff가 너무 커서 앞부분만 리뷰되었습니다." : ""}`;
+\`\`\`diff
+${diff}
+\`\`\`
+${truncated ? "\n> ⚠️  diff가 너무 커서 앞부분만 리뷰되었습니다." : ""}`;
 
-    const model = "gpt-5.1-codex-mini"
-    const context = [
-      { role: 'user', content: prompt }
-    ];
+  const model = "gpt-5.1-codex-mini";
+  const context = [{ role: "user", content: prompt }];
 
-    const response = await client.responses.create({
-      model: model,
-      input: context,
-      max_output_tokens: 2000,
-    });
-
-    const review = response.output_text;
-    await postComment(`## AI 코드 리뷰\n\n${review}\n\n---\n*Powered by OpenAI ${model}*`);
-    console.log("리뷰 코멘트 등록 완료");
-  }
-
-  main().catch((error) => {
-    console.error(error);
-    process.exit(1);
+  const response = await client.responses.create({
+    model: model,
+    input: context,
+    max_output_tokens: 2000,
   });
+
+  const review = response.output_text;
+  writeToStepSummary(
+    `## AI 코드 리뷰\n\n${review}\n\n---\n*Powered by OpenAI ${model}*\n`,
+  );
+  console.log("Step Summary 등록 완료");
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
