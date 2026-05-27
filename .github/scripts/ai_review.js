@@ -4,7 +4,12 @@ import OpenAI from "openai";
 const MAX_CHARS = 80_000;
 
 function writeToStepSummary(body) {
-  appendFileSync(process.env.GITHUB_STEP_SUMMARY, body);
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryPath) {
+    appendFileSync(summaryPath, body);
+  } else {
+    console.log("[Step Summary 미지원 환경] 리뷰 결과:\n", body);
+  }
 }
 
 async function main() {
