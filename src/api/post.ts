@@ -2,6 +2,17 @@ import supabase from "@/lib/supabase";
 import { uploadImage } from "./image";
 import type { PostEntity } from "@/types";
 
+export async function fetchPosts() {
+  const { data, error } = await supabase
+    .from("post")
+    .select("*, author: profile!author_id (*)")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return data;
+}
+
 export async function createPost(content: string) {
   // supabase는 insert까지만 작성하면 테이블에 추가만 되고 데이터를 반환하지 않음 그래서 select와 single을 써서 반환해야 함
   const { data, error } = await supabase
