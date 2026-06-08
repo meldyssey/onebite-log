@@ -63,6 +63,10 @@ ${truncated ? "\n> ⚠️  diff가 너무 커서 앞부분만 리뷰되었습니
   });
 
   const review = response.output_text;
+  if (!review.trim()) {
+    console.log("리뷰 내용 없음, 코멘트 생략");
+    return;
+  }
   writeToStepSummary(
     `## AI 코드 리뷰\n\n${review}\n\n---\n*Powered by OpenAI ${model}*\n`,
   );
