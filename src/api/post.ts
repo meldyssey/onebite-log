@@ -14,6 +14,18 @@ export async function fetchPosts({ from, to }: { from: number; to: number }) {
   return data;
 }
 
+export async function fetchPostById(postId: number) {
+  const { data, error } = await supabase
+    .from("post")
+    .select("*, author: profile!author_id (*)")
+    .eq("id", postId)
+    .single();
+
+  if (error) throw error;
+
+  return data;
+}
+
 export async function createPost(content: string) {
   // supabase는 insert까지만 작성하면 테이블에 추가만 되고 데이터를 반환하지 않음 그래서 select와 single을 써서 반환해야 함
   const { data, error } = await supabase
